@@ -30,6 +30,10 @@ class FlyTViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // Estado de registro exitoso
+    private val _registrationSuccess = MutableStateFlow(false)
+    val registrationSuccess: StateFlow<Boolean> = _registrationSuccess.asStateFlow()
+
     // Inicializar con usuario admin por defecto
     init {
         _registeredUsers.value = listOf(
@@ -42,6 +46,12 @@ class FlyTViewModel : ViewModel() {
                 birthday = ""
             )
         )
+    }
+
+    // Validar email
+    private fun isValidEmail(email: String): Boolean {
+        val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$".toRegex()
+        return email.matches(emailRegex)
     }
 
     // Login
@@ -75,7 +85,83 @@ class FlyTViewModel : ViewModel() {
         }
     }
 
-    // Registrar nuevo usuario
+    // Validar y registrar nuevo usuario
+    fun validateAndRegisterUser(
+        name: String,
+        lastName: String,
+        email: String,
+        phoneNumber: String,
+        birthday: String,
+        password: String,
+        confirmPassword: String,
+        photoUri: String
+    ): Boolean {
+        // Validaciones
+        when {
+            name.isBlank() -> {
+                _errorMessage.value = "El nombre es obligatorio"
+                return false
+            }
+            lastName.isBlank() -> {
+                _errorMessage.value = "El apellido es obligatorio"
+                return false
+            }
+            email.isBlank() -> {
+                _errorMessage.value = "El correo electrónico es obligatorio"
+                return false
+            }
+            !isValidEmail(email) -> {
+                _errorMessage.value = "El correo electrónico no es válido. Ejemplo: usuario@dominio.com"
+                return false
+            }
+            _registeredUsers.value.any { it.email.equals(email, ignoreCase = true) } -> {
+                _errorMessage.value = "El correo electrónico ya está registrado"
+                return false
+            }
+            phoneNumber.isBlank() -> {
+                _errorMessage.value = "El teléfono es obligatorio"
+                return false
+            }
+            birthday.isBlank() -> {
+                _errorMessage.value = "La fecha de nacimiento es obligatoria"
+                return false
+            }
+            password.isBlank() -> {
+                _errorMessage.value = "La contraseña es obligatoria"
+                return false
+            }
+            password.length < 6 -> {
+                _errorMessage.value = "La contraseña debe tener al menos 6 caracteres"
+                return false
+            }
+            password != confirmPassword -> {
+                _errorMessage.value = "Las contraseñas no coinciden"
+                return false
+            }
+        }
+
+        // Si todas las validaciones pasan, crear el usuario
+        val newUser = Users(
+            name = name,
+            lastName = lastName,
+            email = email,
+            phoneNumber = phoneNumber,
+            birthday = birthday,
+            password = password,
+            photoUri = photoUri
+        )
+
+        viewModelScope.launch {
+            _registeredUsers.value = _registeredUsers.value.toMutableList().apply {
+                add(newUser)
+            }
+            _errorMessage.value = null
+            _registrationSuccess.value = true
+        }
+        return true
+    }
+
+    // Registrar nuevo usuario (método antiguo mantenido para compatibilidad)
     fun registerUser(user: Users): Boolean {
         // Validar que el email no esté registrado
         if (_registeredUsers.value.any { it.email == user.email }) {
@@ -95,6 +181,7 @@ class FlyTViewModel : ViewModel() {
                 add(user)
             }
             _errorMessage.value = null
+            _registrationSuccess.value = true
         }
         return true
     }
@@ -122,6 +209,8 @@ class FlyTViewModel : ViewModel() {
             return false
         }
 
+        // Aquí implementarías la lógica de búsqueda de vuelos
+        // Por ahora solo validamos
         _errorMessage.value = null
         return true
     }
@@ -129,6 +218,11 @@ class FlyTViewModel : ViewModel() {
     // Limpiar mensaje de error
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    // Limpiar estado de registro exitoso
+    fun clearRegistrationSuccess() {
+        _registrationSuccess.value = false
     }
 
     // Limpiar formulario de búsqueda

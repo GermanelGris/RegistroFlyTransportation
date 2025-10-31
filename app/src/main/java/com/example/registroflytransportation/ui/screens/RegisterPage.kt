@@ -2,13 +2,13 @@ package com.example.registroflytransportation.ui.screens
 
 import android.Manifest
 import android.content.ContentValues
-import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,25 +21,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
+import androidx.compose.ui.window.Dialog
 import coil.compose.rememberAsyncImagePainter
-import com.example.registroflytransportation.model.Users
 import com.example.registroflytransportation.ui.theme.*
 import com.example.registroflytransportation.viewModel.FlyTViewModel
-import java.io.File
+import kotlinx.coroutines.delay
 
 @Composable
 fun RegisterPage(
@@ -56,10 +58,10 @@ fun RegisterPage(
     var confirmarPassword by remember { mutableStateOf("") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var savedPhotoUri by remember { mutableStateOf<Uri?>(null) }
-    var localError by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-    val vmErrorMessage by viewModel.errorMessage.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val registrationSuccess by viewModel.registrationSuccess.collectAsState()
 
     // Crear URI para guardar en galería
     fun createImageUriInGallery(): Uri? {
@@ -78,7 +80,6 @@ fun RegisterPage(
             )
         } catch (e: Exception) {
             Log.e("RegisterPage", "Error creating gallery URI", e)
-            localError = "Error al crear URI: ${e.message}"
             null
         }
     }
@@ -91,11 +92,8 @@ fun RegisterPage(
     ) { success ->
         if (success && tempUri != null) {
             photoUri = tempUri
-            savedPhotoUri = tempUri // Guardar la URI permanente
-            localError = null
+            savedPhotoUri = tempUri
             Log.d("RegisterPage", "Photo saved to gallery: $savedPhotoUri")
-        } else {
-            localError = "No se pudo tomar la foto"
         }
     }
 
@@ -112,14 +110,19 @@ fun RegisterPage(
                     cameraLauncher.launch(tempUri!!)
                 } catch (e: Exception) {
                     Log.e("RegisterPage", "Error launching camera", e)
-                    localError = "Error al abrir cámara: ${e.message}"
                 }
-            } else {
-                localError = "Error al crear archivo en galería"
             }
-        } else {
-            localError = "Permiso de cámara denegado"
         }
+    }
+
+    // Dialog de éxito
+    if (registrationSuccess) {
+        SuccessDialog(
+            onDismiss = {
+                viewModel.clearRegistrationSuccess()
+                onRegisterSuccess()
+            }
+        )
     }
 
     Box(
@@ -240,7 +243,6 @@ fun RegisterPage(
                     value = nombre,
                     onValueChange = {
                         nombre = it
-                        localError = null
                         viewModel.clearError()
                     },
                     label = { Text("Nombre") },
@@ -261,7 +263,6 @@ fun RegisterPage(
                     value = apellido,
                     onValueChange = {
                         apellido = it
-                        localError = null
                         viewModel.clearError()
                     },
                     label = { Text("Apellido") },
@@ -286,10 +287,10 @@ fun RegisterPage(
                 value = email,
                 onValueChange = {
                     email = it
-                    localError = null
                     viewModel.clearError()
                 },
                 label = { Text("Correo Electrónico") },
+                placeholder = { Text("ejemplo@correo.com") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
@@ -313,7 +314,10 @@ fun RegisterPage(
             ) {
                 OutlinedTextField(
                     value = telefono,
-                    onValueChange = { telefono = it; localError = null },
+                    onValueChange = {
+                        telefono = it
+                        viewModel.clearError()
+                    },
                     label = { Text("Teléfono") },
                     modifier = Modifier
                         .weight(1f)
@@ -331,7 +335,10 @@ fun RegisterPage(
 
                 OutlinedTextField(
                     value = fechaNacimiento,
-                    onValueChange = { fechaNacimiento = it; localError = null },
+                    onValueChange = {
+                        fechaNacimiento = it
+                        viewModel.clearError()
+                    },
                     label = { Text("Fecha Nac.") },
                     placeholder = { Text("DD/MM/YYYY") },
                     modifier = Modifier
@@ -357,7 +364,10 @@ fun RegisterPage(
             ) {
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it; localError = null },
+                    onValueChange = {
+                        password = it
+                        viewModel.clearError()
+                    },
                     label = { Text("Contraseña") },
                     modifier = Modifier
                         .weight(1f)
@@ -376,7 +386,10 @@ fun RegisterPage(
 
                 OutlinedTextField(
                     value = confirmarPassword,
-                    onValueChange = { confirmarPassword = it; localError = null },
+                    onValueChange = {
+                        confirmarPassword = it
+                        viewModel.clearError()
+                    },
                     label = { Text("Confirmar") },
                     modifier = Modifier
                         .weight(1f)
@@ -395,15 +408,23 @@ fun RegisterPage(
             }
 
             // Errores
-            val errorToShow = localError ?: vmErrorMessage
-            if (errorToShow != null) {
+            if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = errorToShow,
-                    color = ErrorRed,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = ErrorRed.copy(alpha = 0.9f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = errorMessage ?: "",
+                        color = White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -411,33 +432,17 @@ fun RegisterPage(
             // Botón Crear Cuenta
             Button(
                 onClick = {
-                    when {
-                        nombre.isEmpty() || apellido.isEmpty() || email.isEmpty() ||
-                                telefono.isEmpty() || fechaNacimiento.isEmpty() || password.isEmpty() -> {
-                            localError = "Completa todos los campos"
-                        }
-                        password != confirmarPassword -> {
-                            localError = "Las contraseñas no coinciden"
-                        }
-                        password.length < 6 -> {
-                            localError = "Contraseña mínimo 6 caracteres"
-                        }
-                        else -> {
-                            val newUser = Users(
-                                name = nombre,
-                                lastName = apellido,
-                                email = email,
-                                phoneNumber = telefono,
-                                birthday = fechaNacimiento,
-                                password = password,
-                                photoUri = savedPhotoUri?.toString() ?: ""
-                            )
-                            val success = viewModel.registerUser(newUser)
-                            if (success) {
-                                onRegisterSuccess()
-                            }
-                        }
-                    }
+                    // Llamar al ViewModel para validar y registrar
+                    viewModel.validateAndRegisterUser(
+                        name = nombre,
+                        lastName = apellido,
+                        email = email,
+                        phoneNumber = telefono,
+                        birthday = fechaNacimiento,
+                        password = password,
+                        confirmPassword = confirmarPassword,
+                        photoUri = savedPhotoUri?.toString() ?: ""
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -471,6 +476,70 @@ fun RegisterPage(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun SuccessDialog(onDismiss: () -> Unit) {
+    var scale by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        ) { value, _ ->
+            scale = value
+        }
+        delay(2000)
+        onDismiss()
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .scale(scale),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Éxito",
+                    modifier = Modifier.size(80.dp),
+                    tint = SuccessGreen
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "¡Registro Exitoso!",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryBlue
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Tu cuenta ha sido creada correctamente",
+                    fontSize = 14.sp,
+                    color = DarkGray,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
