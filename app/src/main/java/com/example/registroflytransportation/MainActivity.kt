@@ -6,10 +6,20 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.registroflytransportation.ui.screens.HomePage
+import com.example.registroflytransportation.ui.screens.LoginPage
+import com.example.registroflytransportation.ui.screens.RegisterPage
 import com.example.registroflytransportation.ui.theme.RegistroFlyTransportationTheme
-import com.example.registroflytransportation.ui.screens.*
+import com.example.registroflytransportation.viewModel.FlyTViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,32 +39,32 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FlyTApp() {
+    val viewModel: FlyTViewModel = viewModel()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var currentUser by remember { mutableStateOf<String?>(null) }
+
+    // Navegación basada en el estado de login
+    LaunchedEffect(isLoggedIn) {
+        currentScreen = if (isLoggedIn) Screen.Home else Screen.Login
+    }
 
     when (currentScreen) {
         is Screen.Login -> {
             LoginPage(
-                onLoginClick = { usuario: String, password: String ->
-                    // Validar credenciales
-                    if (usuario == "admin" && password == "123456") {
-                        currentUser = usuario
-                        isLoggedIn = true
-                        currentScreen = Screen.Home
-                    } else {
-                        // Credenciales incorrectas
-                        // Aquí podrías mostrar un mensaje de error
-                    }
+                viewModel = viewModel,
+                onLoginSuccess = {
+                    currentScreen = Screen.Home
                 },
-                onRegisterClick = {
+                onNavigateToRegister = {
                     currentScreen = Screen.Register
                 }
             )
         }
         is Screen.Register -> {
             RegisterPage(
-                onRegisterComplete = {
+                viewModel = viewModel,
+                onRegisterSuccess = {
                     currentScreen = Screen.Login
                 },
                 onBackToLogin = {
@@ -64,10 +74,10 @@ fun FlyTApp() {
         }
         is Screen.Home -> {
             HomePage(
-                userName = currentUser ?: "",
+                viewModel = viewModel,
+                userName = currentUser?.name ?: "Usuario",
                 onLogout = {
-                    isLoggedIn = false
-                    currentUser = null
+                    viewModel.logout()
                     currentScreen = Screen.Login
                 }
             )

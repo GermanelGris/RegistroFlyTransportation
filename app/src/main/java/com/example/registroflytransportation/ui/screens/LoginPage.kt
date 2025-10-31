@@ -10,31 +10,33 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.registroflytransportation.R
+import com.example.registroflytransportation.ui.theme.*
+import com.example.registroflytransportation.viewModel.FlyTViewModel
 
 @Composable
 fun LoginPage(
-    onLoginClick: (String, String) -> Unit = { _, _ -> },
-    onRegisterClick: () -> Unit = {}
+    viewModel: FlyTViewModel,
+    onLoginSuccess: () -> Unit,
+    onNavigateToRegister: () -> Unit
 ) {
     var usuario by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF6B8EFF),
-                        Color(0xFF8B6FB8)
-                    )
+                    colors = listOf(BlueStart, PurpleEnd)
                 )
             )
     ) {
@@ -49,20 +51,13 @@ fun LoginPage(
             Box(
                 modifier = Modifier
                     .size(180.dp)
-                    .background(Color.White, RoundedCornerShape(16.dp)),
+                    .background(White, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                // Aquí iría la imagen del logo
-                // Image(
-                //     painter = painterResource(id = R.drawable.logo_flyt),
-                //     contentDescription = "Logo FLY T",
-                //     modifier = Modifier.size(160.dp)
-                // )
-                Text(
-                    text = "FLY T",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
+                Image(
+                    painter = painterResource(id = R.drawable.flyt),
+                    contentDescription = "Logo FLY T",
+                    modifier = Modifier.size(160.dp)
                 )
             }
 
@@ -71,16 +66,20 @@ fun LoginPage(
             // Campo Usuario
             OutlinedTextField(
                 value = usuario,
-                onValueChange = { usuario = it },
+                onValueChange = {
+                    usuario = it
+                    viewModel.clearError()
+                },
                 label = { Text("Usuario") },
+                placeholder = { Text("admin") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF1976D2),
-                    unfocusedBorderColor = Color.Transparent
+                    focusedContainerColor = White,
+                    unfocusedContainerColor = White,
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = White
                 ),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true
@@ -91,16 +90,20 @@ fun LoginPage(
             // Campo Password
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it
+                    viewModel.clearError()
+                },
                 label = { Text("Password") },
+                placeholder = { Text("123456") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF1976D2),
-                    unfocusedBorderColor = Color.Transparent
+                    focusedContainerColor = White,
+                    unfocusedContainerColor = White,
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = White
                 ),
                 shape = RoundedCornerShape(8.dp),
                 visualTransformation = PasswordVisualTransformation(),
@@ -108,17 +111,37 @@ fun LoginPage(
                 singleLine = true
             )
 
+            // Mensaje de error
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = errorMessage ?: "",
+                    color = ErrorRed,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Botón Iniciar Sesión
             Button(
-                onClick = { onLoginClick(usuario, password) },
+                onClick = {
+                    if (usuario.isBlank() || password.isBlank()) {
+                        // El ViewModel manejará el error
+                    } else {
+                        val success = viewModel.login(usuario, password)
+                        if (success) {
+                            onLoginSuccess()
+                        }
+                    }
+                },
                 modifier = Modifier
                     .width(200.dp)
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black
+                    containerColor = White,
+                    contentColor = Black
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -133,17 +156,15 @@ fun LoginPage(
 
             // Botón Registrarse
             OutlinedButton(
-                onClick = onRegisterClick,
+                onClick = onNavigateToRegister,
                 modifier = Modifier
                     .width(200.dp)
                     .height(48.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color.White
+                    contentColor = White
                 ),
                 shape = RoundedCornerShape(8.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    width = 2.dp
-                )
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
             ) {
                 Text(
                     text = "Registrarse",
